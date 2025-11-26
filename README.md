@@ -1,3 +1,5 @@
+***
+
 # OptimizedVehicleSystem - Quick Start Guide
 
 ## Overview
@@ -36,6 +38,8 @@ This system runs on a custom asynchronous physics tick, offering approximately *
 3.  Add this component to the actor.
     *   *Note:* This component acts as the "Brain" of the vehicle. It handles input, physics forces, and aggregates data from engines and wheels.
 
+![Modular Vehicle Core Details](images/vehicle_core.png)
+
 ---
 
 ## 3. Assembling the Vehicle
@@ -45,6 +49,8 @@ You do not need to drag in static meshes for wheels or rotors manually. You will
 1.  Click **+ Add** and search for `ModularEngineComponent`.
 2.  This handles torque and gear ratios.
 3.  **Defaults:** The default values (Torque: 500, Max Speed: 120) are tuned to work out of the box for most vehicles.
+
+![Modular Engine Component Details](images/engine_component.png)
 
 ### Adding Wheels
 1.  Click **+ Add** and search for `ModularWheelComponent`.
@@ -59,6 +65,8 @@ You do not need to drag in static meshes for wheels or rotors manually. You will
     *   **Is Handbrake Wheel:** Check this for rear wheels (typically).
 5.  **Repeat:** Duplicate this component for all 4 wheels (Front Right, Rear Left, Rear Right).
 
+![Modular Wheel Component Details](images/wheel_component.png)
+
 ### Adding Rotors (For Flight/Hybrids)
 *Optional: Only required if you want the vehicle to fly.*
 
@@ -67,6 +75,8 @@ You do not need to drag in static meshes for wheels or rotors manually. You will
 3.  **Visuals:**
     *   In the Details Panel under **Visuals**, assign your propeller/blade **Static Mesh** to the **Rotor Mesh** slot.
 4.  **Logic:** The defaults are tuned for immediate lift-off capability.
+
+![Modular Rotor Component Details](images/rotor_component.png)
 
 ---
 
