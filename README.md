@@ -1,116 +1,163 @@
-***
-
-# OptimizedVehicleSystem - Quick Start Guide
+# OptimizedVehicleSystem - Documentation & Quick Start
 
 ## Overview
-The **OptimizedVehicleSystem** is a high-performance, modular vehicle plugin for Unreal Engine 5. It allows you to create complex vehicles (Cars, Helicopters, and Hybrids) using **Static Meshes only**. No skeletal meshes, no rigging, and no Animation Blueprints are required.
+The **OptimizedVehicleSystem** is a high-performance, modular vehicle plugin for Unreal Engine 5. It allows you to create complex vehicles (Cars, Trucks, Bikes, Helicopters, and Hybrids) using **Static Meshes only**.
 
-This system runs on a custom asynchronous physics tick, offering approximately **30% better performance** than the native Chaos Vehicles plugin.
+**Key Features:**
+*   **Performance:** Runs on a custom asynchronous physics tick (`NativeAsyncTick`), offering significant performance gains over native Chaos vehicles.
+*   **Modular Design:** No skeletal meshes required. Snap components together (Wheels, Engines, Rotors) to build any vehicle type.
+*   **Hybrid Support:** Seamlessly transition between Ground driving and Flight physics in real-time.
+*   **Bike Physics:** dedicated physics solver for 2-wheeled vehicles (leaning, counter-steering, stability).
+*   **Full AI Support:** Includes a complete AI stack (Behavior Trees, Tasks, Services) and a simple "Move To" Async node for Blueprints.
 
 ---
 
 ## 1. Project Setup
 
-1.  Ensure the **OptimizedVehicleSystem** plugin is enabled in your project (`Edit > Plugins`).
-2.  Ensure you have **Enhanced Input** enabled in your project settings (Standard for UE5).
+1.  Ensure the **OptimizedVehicleSystem** plugin is enabled in `Edit > Plugins`.
+2.  Ensure **Enhanced Input** is enabled in Project Settings.
 
 ---
 
-## 2. Creating Your Vehicle
+## 2. Creating a Vehicle
 
 ### Step 1: Create the Pawn
-1.  In the Content Browser, right-click and create a new **Blueprint Class**.
-2.  Search for and select **Pawn** (or `OptimizedTickPawn` if you plan to add custom C++ logic later).
-3.  Name it (e.g., `BP_MyHybridVehicle`).
+1.  Create a new **Blueprint Class**.
+2.  Search for and select **Pawn** (or `OptimizedTickPawn` for C++ extension).
+3.  Name it (e.g., `BP_ModularCar`).
 
-### Step 2: Setup the Body (Root)
-*The system requires the physical body of the vehicle to be the Root Component.*
+### Step 2: Setup the Chassis (Root)
+*The system relies on the physical body being the Root Component.*
+1.  Open the Blueprint.
+2.  Drag your chassis **Static Mesh** to replace the `DefaultSceneRoot`.
+3.  **Details Panel settings:**
+    *   **Simulate Physics:** `True`
+    *   **Mass (kg):** Set a realistic mass (e.g., 1500 for a car).
+    *   **Collision:** Use `PhysicsActor` or `BlockAll`.
 
-1.  Open your new Blueprint.
-2.  Drag your vehicle body/chassis **Static Mesh** into the Components panel and make it the **Root Component** (drag it over `DefaultSceneRoot` to replace it).
-3.  With the Root Static Mesh selected, look at the **Details Panel**:
-    *   **Simulate Physics:** Check **TRUE**.
-    *   **Collision Presets:** Ensure it is set to `PhysicsActor` or a custom profile that blocks WorldStatic/WorldDynamic.
-
-### Step 3: Add the Core System
-1.  Click **+ Add** in the Components panel.
-2.  Search for `ModularVehicleCore`.
-3.  Add this component to the actor.
-    *   *Note:* This component acts as the "Brain" of the vehicle. It handles input, physics forces, and aggregates data from engines and wheels.
-
-![Modular Vehicle Core Details](images/vehicle_core.png)
-
----
-
-## 3. Assembling the Vehicle
-You do not need to drag in static meshes for wheels or rotors manually. You will use the **Modular Components** to handle both the logic and the visuals.
-
-### Adding an Engine
-1.  Click **+ Add** and search for `ModularEngineComponent`.
-2.  This handles torque and gear ratios.
-3.  **Defaults:** The default values (Torque: 500, Max Speed: 120) are tuned to work out of the box for most vehicles.
-
-![Modular Engine Component Details](images/engine_component.png)
-
-### Adding Wheels
-1.  Click **+ Add** and search for `ModularWheelComponent`.
-2.  **Positioning:** Move the component in the Viewport to where you want the wheel to be (e.g., Front Left).
-3.  **Visuals:**
-    *   Select the `ModularWheelComponent`.
-    *   In the Details Panel, look for the **Visuals** category.
-    *   Assign your **Static Mesh** to the **Wheel Mesh** slot.
-    *   *Optional:* If the wheel mesh is facing the wrong way, check **Flip Visual Rotation**.
-4.  **Configuration:**
-    *   **Is Steer Wheel:** Check this for front wheels.
-    *   **Is Handbrake Wheel:** Check this for rear wheels (typically).
-5.  **Repeat:** Duplicate this component for all 4 wheels (Front Right, Rear Left, Rear Right).
-
-![Modular Wheel Component Details](images/wheel_component.png)
-
-### Adding Rotors (For Flight/Hybrids)
-*Optional: Only required if you want the vehicle to fly.*
-
-1.  Click **+ Add** and search for `ModularRotorComponent`.
-2.  **Positioning:** Move the component to the roof or wing of your vehicle.
-3.  **Visuals:**
-    *   In the Details Panel under **Visuals**, assign your propeller/blade **Static Mesh** to the **Rotor Mesh** slot.
-4.  **Logic:** The defaults are tuned for immediate lift-off capability.
-
-![Modular Rotor Component Details](images/rotor_component.png)
+### Step 3: Add the Core
+1.  Add the `ModularVehicleCore` component.
+2.  This component automatically scans for attached parts (Wheels, Engines, Rotors) at `BeginPlay`.
+3.  **Key Settings:**
+    *   **Auto Calibrate Suspension:** If true, automatically calculates spring stiffness based on vehicle mass.
+    *   **Arcade Drift Assist:** Helps align the vehicle with velocity during drifts (0.0 = Realism, 1.0 = Arcade).
 
 ---
 
-## 4. Input Configuration
-The `ModularVehicleCore` automatically handles Enhanced Input bindings.
+## 3. Modular Components
 
-1.  Select the `ModularVehicleCore` component.
-2.  In the Details Panel, locate the **Input Settings** category.
+### A. Modular Engine (Powertrain & Audio)
+Adds torque and manages gear ratios.
+*   **Add Component:** `ModularEngineComponent`.
+*   **Audio:** Assign an `EngineSound`. The pitch automatically adjusts based on simulated RPM.
+*   **Transmission:** Configurable Gear Ratios and Differential Ratio.
+*   **Setup:** You usually only need one, but you can add multiple for hybrid setups.
+
+### B. Modular Wheels (Suspension & Traction)
+Handles raycasting, suspension physics, and friction.
+*   **Add Component:** `ModularWheelComponent`.
+*   **Visuals:** Assign a Static Mesh to `Wheel Mesh`. Use `Flip Visual Rotation` if it faces the wrong way.
+*   **Configuration:**
+    *   **bIsSteerWheel:** Check for front wheels.
+    *   **bIsDriveWheel:** Check to apply engine torque (e.g., check Rear wheels only for RWD).
+    *   **bIsHandbrakeWheel:** Check for wheels affected by the handbrake.
+*   **Placement:** Place the component exactly where the wheel hub should be. The visual mesh will spawn there.
+
+### C. Modular Rotors (Flight)
+Adds vertical lift and flight control torque.
+*   **Add Component:** `ModularRotorComponent`.
+*   **Visuals:** Assign a Propeller mesh. It handles spool-up rotation and audio automatically.
+*   **Physics:**
+    *   `LiftPowerMultiplier`: Increases vertical thrust efficiency.
+    *   `MaxRotationSpeed`: Visual speed of the blades.
+
+### D. Modular Steering Wheel (Interior)
+Purely visual component that rotates based on steering input.
+*   **Add Component:** `ModularSteeringWheelComponent`.
+*   **Setup:** Assign your steering wheel mesh.
+*   **Axis:** Select which axis rotates (Roll, Pitch, or Yaw) to match your mesh's pivot.
+
+---
+
+## 4. Vehicle Types & Configurations
+
+### Standard 4-Wheeled Car
+*   1x Chassis (Root)
+*   1x Core
+*   1x Engine
+*   4x Wheels (2x Steer, 2x Drive/Handbrake)
+
+### Motorbikes
+The system includes a dedicated controller for 2-wheeled physics.
+1.  Setup a vehicle with exactly **2 Modular Wheels**.
+2.  Select `ModularVehicleCore`.
+3.  Check **bIsBikeConfiguration**.
+4.  **Tuning:**
+    *   `BikeMaxLeanAngle`: How far the bike tilts when turning.
+    *   `BikeLowSpeedStiffness`: Keeps the bike upright when stopped/slow.
+
+### Hybrids (Car + Heli)
+1.  Setup a car as normal.
+2.  Add **Modular Rotor** components (e.g., one main rotor, one tail rotor, or quadcopter layout).
+3.  Map the `ToggleFlightModeAction` input.
+4.  When activated, the Core disables wheel torque and enables rotor physics.
+
+---
+
+## 5. Input Configuration
+Inputs are handled via Enhanced Input directly on the `ModularVehicleCore`.
+
+1.  Select `ModularVehicleCore`.
+2.  Go to the **Input Settings** category.
 3.  Assign your **Input Mapping Context** (IMC).
-4.  Assign your **Input Actions** (IA) for:
-    *   Throttle (Float)
-    *   Steering (Float)
-    *   Handbrake (Bool)
-    *   Vertical Thrust (Float - *For Flight*)
-    *   Flight Pitch/Yaw/Roll (Float - *For Flight*)
-    *   Toggle Flight Mode (Trigger - *For Hybrids*)
+4.  Bind the specific Actions:
+    *   **Throttle/Steering/Handbrake:** Standard driving.
+    *   **EngineStartAction:** Toggles engine on/off.
+    *   **ToggleFlightModeAction:** Switches between Ground and Air physics.
+    *   **VerticalThrust/Pitch/Yaw/Roll:** Flight controls.
 
 ---
 
-## 5. Play & Drive
-1.  Drag your `BP_MyHybridVehicle` into the level.
-2.  In the details panel for the Actor, ensure **Auto Possess Player** is set to `Player 0`.
-3.  Press **Play**.
+## 6. AI System (New)
 
-**The Default Experience:**
-*   The vehicle will settle on its suspension immediately.
-*   The engine is on by default.
-*   **Driving:** Use your Throttle/Steering inputs to drive like a car.
-*   **Flying:** Press your "Toggle Flight Mode" input. The rotors will spool up, and you can use Vertical Thrust to take off.
+The plugin comes with a fully integrated AI Controller and Behavior Tree system specifically designed for these physics vehicles.
+
+### Setup AI
+1.  Add the `ModularVehicleAIComponent` to your Vehicle Pawn.
+2.  The component will automatically spawn the `ModularVehicleAIController`.
+3.  **Behavior Tree:** The plugin includes a default BT, but you can assign your own in the component settings.
+
+### Moving the Vehicle (Blueprint)
+You don't need to touch the Behavior Tree manually for simple movements. Use the **Async Action**:
+
+1.  In your GameMode or Level Blueprint, right-click and search for **"Modular Vehicle Move To"**.
+2.  **Target Location:** Where to go.
+3.  **Prioritize Driving:**
+    *   `True`: The AI will drive on the ground.
+    *   `False`: The AI will fly (if it has rotors).
+4.  **Flight Config:** Customize cruising altitude and landing behavior.
+5.  **Outputs:** Use the `On Arrived` or `On Failed` pins to handle logic.
+
+### AI Features
+*   **Pathfinding:** Uses Navigation Mesh for ground vehicles.
+*   **Smart Cornering:** Slows down before sharp turns (Calculated in `BTService_GroundPathPlanner`).
+*   **Obstacle Recovery:** Auto-detects if the vehicle is stuck and attempts 3-point turns or air recovery maneuvers.
+*   **Hybrid Logic:** The AI intelligently switches between driving and flying based on the `PrioritizeDriving` boolean and available parts.
 
 ---
 
-## Troubleshooting Tips
+## 7. Troubleshooting
 
-*   **Vehicle falls through the floor:** Ensure your Root Static Mesh has valid Simple Collision.
-*   **Wheels look weird:** If your wheels are rotating around the wrong axis, adjust the **Wheel Mesh** pivot in the Static Mesh Editor, or use the `FlipVisualRotation` boolean in the component.
-*   **Vehicle is too slow/fast:** Adjust the **Engine Torque** in the `ModularEngineComponent` or the **Stiffness** in the `ModularWheelComponent`.
+*   **Vehicle won't move:**
+    *   Is the Engine on? (Map the Start Engine input).
+    *   Do you have `bIsDriveWheel` checked on at least one wheel?
+    *   Is the Handbrake engaged?
+*   **Vehicle flips immediately:**
+    *   Check your Physics Asset collisions.
+    *   Ensure `CenterOfMassOffset` in the Core settings is low (negative Z value).
+*   **AI creates path but doesn't move:**
+    *   Ensure a NavMeshBoundsVolume is present in the level.
+    *   Check if `DesiredSpeed` in the AI Blackboard is being set (Debug via Behavior Tree view).
+*   **Bike falls over:**
+    *   Ensure `bIsBikeConfiguration` is checked.
+    *   Increase `BikeUprightStiffness` in the Core settings.
