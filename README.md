@@ -104,27 +104,6 @@ Purely visual component that rotates based on steering input.
 - **Setup:** Assign your steering wheel mesh.
 - **Axis:** Select which axis rotates (Roll, Pitch, or Yaw) to match your mesh's pivot.
 
-### E. Modular Damage (Vehicle Destruction)
-
-Adds impact-based mesh deformation and part detachment.
-
-- **Add Component:** `ModularDamageComponent`
-- **Key Settings:**
-  - `DeformationRadius` — Radius around impact point to deform (default `40 cm`).
-  - `DeformationStrength` — Intensity multiplier (default `1.0`).
-  - `MaxDeformationDepth` — Maximum deformation depth (default `15 cm`).
-  - `MinImpactForceThreshold` — Minimum force to trigger damage (default `5000`).
-  - `bUseAsyncDeformation` — Async processing to prevent frame hitches (default `true`).
-  - `MaxVerticesPerDeform` — Vertex budget per impact (default `300`, range `50–2000`).
-- **Part Detachment:**
-  - `bEnablePartDetachment` — Enable the part state system.
-  - `DamageToHangThreshold` — Damage % to enter "hanging" state (default `60%`).
-  - `DamageToDetachThreshold` — Damage % to fully detach (default `90%`).
-  - `HangingSwingLimit` — Max swing angle for hanging parts (default `45°`).
-  - `DetachedPartLifetime` — Seconds before detached parts are removed (default `10s`).
-- **Damage Zones:** Define named zones (hood, doors, bumper) with independent damage tracking.
-- **Events:** `OnVehicleDamaged` and `OnPartStateChanged` delegates for gameplay integration.
-
 ---
 
 ## 4. Vehicle Types & Configurations
@@ -321,26 +300,7 @@ In `Project Settings > Plugins > Mass Traffic`:
 
 ---
 
-## 8. Dynamic Mud Pit
-
-Place an `AModularMudPit` actor in your level for deformable terrain.
-
-**Key Settings:**
-
-| Property | Default | Description |
-|----------|---------|-------------|
-| `PitSize` | 2000×2000 | Dimensions of the mud area (cm) |
-| `MaxSinkDepth` | 35 | Maximum sink depth (cm) |
-| `SurfaceNoiseMagnitude` | 15 | Amplitude of surface noise for natural look |
-| `NoiseFrequency` | 0.05 | Frequency of surface noise |
-| `RenderTargetResolution` | 1024 | Visual deformation texture resolution |
-| `PhysicsGridResolution` | 128 | CPU physics grid resolution (keep low) |
-
-Vehicles driving through the pit will physically sink based on mud depth and leave persistent wheel tracks.
-
----
-
-## 9. Flight System
+## 8. Flight System
 
 ### Flight Model (ModularVehicleCore)
 
@@ -371,7 +331,7 @@ Configure via `FModularFlightConfig`:
 
 ---
 
-## 10. Included Content
+## 9. Included Content
 
 ### Vehicle Blueprints (14)
 
@@ -393,7 +353,7 @@ Configure via `FModularFlightConfig`:
 
 ---
 
-## 11. Troubleshooting
+## 10. Troubleshooting
 
 **Vehicle won't move:**
 - Is the Engine on? (Map the `EngineStartAction` input).
@@ -424,12 +384,3 @@ Configure via `FModularFlightConfig`:
 - Ensure `bIsBikeConfiguration` is checked on the Core.
 - Increase `BikeUprightStiffness` and `BikeLowSpeedStiffness`.
 
-**Damage not triggering:**
-- Ensure `ModularDamageComponent` is attached.
-- Check `MinImpactForceThreshold` — lower it if impacts aren't strong enough.
-- Verify `Simulate Physics` is enabled on the chassis.
-
-**Vehicles not sinking in mud:**
-- Ensure `AModularMudPit` is placed and scaled correctly.
-- Check that `MaxSinkDepth` is greater than 0.
-- Verify vehicles have `ModularWheelComponent` attached.
