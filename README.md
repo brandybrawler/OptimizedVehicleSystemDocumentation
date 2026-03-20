@@ -7,8 +7,6 @@ The **OptimizedVehicleSystem** is a high-performance, modular vehicle plugin for
 **What's Included:**
 - **Modular Vehicle Physics** — Cars, trucks, bikes, helicopters, and hybrid VTOL vehicles.
 - **Complete AI Traffic System** — Hundreds of AI vehicles driving roads, obeying traffic rules, and following each other at safe distances using the Mass Entity Framework.
-- **Vehicle Damage** — Real-time mesh deformation with part detachment.
-- **Dynamic Mud Terrain** — Vehicles sink and leave tracks in deformable mud pits.
 - **14 Vehicle Blueprints** — Ready-to-use cars, trucks, and helicopters.
 - **City Environment** — A full city level with buildings, road network, and pre-configured traffic. Import the plugin, open the level, and press Play.
 
