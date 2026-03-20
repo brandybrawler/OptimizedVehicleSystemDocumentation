@@ -69,7 +69,7 @@ Adds torque and manages gear ratios.
 
 - **Add Component:** `ModularEngineComponent`
 - **Audio:** Assign an `EngineSound`. Pitch automatically adjusts based on simulated RPM.
-- **Transmission:** Configurable Gear Ratios, Differential Ratio, and automatic/manual shifting.
+- **Transmission:** Supports both **Automatic** and **Manual** modes. In manual mode, the player shifts gears using `ShiftUpAction` / `ShiftDownAction` and controls the `ClutchAction` for realistic clutch engagement. In automatic mode, gear changes happen based on RPM thresholds. Both modes use configurable Gear Ratios and Differential Ratio.
 - **Setup:** Usually one engine, but you can add multiple for hybrid setups.
 
 ### B. Modular Wheels (Suspension & Traction)
@@ -220,7 +220,7 @@ Right-click in your GameMode or Level Blueprint and search for **"Modular Vehicl
 
 The traffic system spawns and manages hundreds of lightweight AI vehicles using Unreal's Mass Entity Framework. These are rendered with Instanced Static Meshes for maximum performance.
 
-### Setup
+### Quick Setup (Using Default Tags)
 
 1. Place an `AModularTrafficManager` in your level.
    - Set `AllowedLaneTags` to match your ZoneGraph lane tags.
@@ -233,6 +233,124 @@ The traffic system spawns and manages hundreds of lightweight AI vehicles using 
    - Set `SpawnCount` — how many vehicles to maintain (default `30`).
 
 3. Ensure your level has **ZoneGraph** baked from `AZoneShape` actors with lane tags matching `AllowedLaneTags`.
+
+### Custom Lane Profiles & Tags
+
+The included city level ships with pre-configured lane tags. If you want to use your own road network with different lane tags (e.g., for a highway system, a European-style road, or a custom map), you need to set up the tag pipeline from ZoneGraph all the way through to the plugin actors. Every actor in the traffic system references lane tags by **FName** — they must all match exactly.
+
+Here is the full process, step by step:
+
+#### Step 1: Define Your Tags in ZoneGraph Project Settings
+
+1. Go to **Project Settings → Plugins → ZoneGraph → Zone Graph Tag List**.
+2. Add your custom tag names. For example, a 2-lane road might use:
+   - `Highway_Left`
+   - `Highway_Right`
+   - `Residential_Left`
+   - `Residential_Right`
+
+   A single-lane one-way road might just use:
+   - `OneWay_Main`
+
+   These names are entirely up to you — the plugin matches on **FName** strings, not hardcoded values.
+
+#### Step 2: Assign Tags to AZoneShape Actors
+
+1. Place `AZoneShape` actors in your level to define your road lanes.
+2. On each ZoneShape, assign the appropriate tag from the dropdown (which now shows your custom tags from Step 1).
+3. Each ZoneShape lane should have exactly **one** traffic-relevant tag. For a 2-lane road, you typically place two parallel ZoneShapes — one tagged `Highway_Left`, the other `Highway_Right`.
+4. **Build ZoneGraph** in the editor toolbar to bake the lane data.
+
+#### Step 3: Configure AModularTrafficManager
+
+Place one `AModularTrafficManager` in the level and set:
+
+- **`AllowedLaneTags`** — Add **every** tag that vehicles are allowed to drive on. This is the master list. For example:
+  ```
+  AllowedLaneTags:
+    [0] Highway_Left
+    [1] Highway_Right
+    [2] Residential_Left
+    [3] Residential_Right
+    [4] OneWay_Main
+  ```
+  Any tag **not** in this list is invisible to the traffic system (pedestrian paths, bike lanes, etc. are automatically excluded).
+
+- **`LanePriorities`** (optional) — Set per-tag right-of-way priority at intersections. Higher number = higher priority. For example, give highways priority over residential roads:
+  ```
+  LanePriorities:
+    Highway_Left     → 2
+    Highway_Right    → 2
+    Residential_Left → 1
+    Residential_Right → 1
+  ```
+
+#### Step 4: Configure AModularTrafficSpawner
+
+Place one `AModularTrafficSpawner` in the level:
+
+- **`AllowedLaneTags`** (on the Spawner) — **Leave this empty** to automatically inherit all tags from `AModularTrafficManager`. Only fill it in if you want this specific spawner to spawn on a subset of tags (e.g., only highway lanes).
+
+  If you fill it in, only lanes matching these tags will receive spawn candidates. For example, to create a spawner that only populates highways:
+  ```
+  AllowedLaneTags:
+    [0] Highway_Left
+    [1] Highway_Right
+  ```
+  You can place **multiple spawners** in a level — each targeting different lane tags with different vehicle classes (e.g., one spawner for trucks on highways, another for taxis on residential roads).
+
+#### Step 5: Configure AModularRoadSpline (Per-Road Speed Limits)
+
+For each road segment where you want a specific speed limit:
+
+1. Place an `AModularRoadSpline` actor alongside the road.
+2. Set **`LaneTagName`** to the tag this speed limit applies to (e.g., `Highway_Left`).
+3. Set **`SpeedLimitKPH`** (e.g., `120` for highways, `50` for residential).
+
+If no `AModularRoadSpline` matches a given tag, vehicles fall back to the `GlobalSpeedLimitKPH` on `AModularTrafficManager` (default `80`).
+
+#### Step 6: BTService_SplineRoadPlanner (Automatic)
+
+The road planner service **automatically** reads `AllowedLaneTags` from `AModularTrafficManager` at runtime. You do not need to configure lane tags on the Behavior Tree service — it picks them up from the Traffic Manager.
+
+The planner uses `FindBestLaneForVehicle()` which iterates all allowed tags, finds the nearest lane for each, and selects the one pointing most toward the vehicle's destination. This means vehicles naturally pick the correct side of the road.
+
+#### Summary: Where Each Tag Goes
+
+| Actor | Property | What to Set |
+|-------|----------|-------------|
+| **ZoneGraph Settings** | Tag List | Define all your custom tag names |
+| **AZoneShape** | Lane Tag | One tag per lane shape |
+| **AModularTrafficManager** | `AllowedLaneTags` | Every driveable tag (master list) |
+| **AModularTrafficManager** | `LanePriorities` | Optional: per-tag junction priority |
+| **AModularTrafficSpawner** | `AllowedLaneTags` | Empty = inherit from manager, or subset |
+| **AModularRoadSpline** | `LaneTagName` | One tag per road segment (for speed limit) |
+| **BTService_SplineRoadPlanner** | *(automatic)* | Reads from TrafficManager at runtime |
+
+#### Example: Custom 3-Road-Type Setup
+
+Suppose you want highways, city streets, and alleys:
+
+**ZoneGraph Tags:**
+`Highway_L`, `Highway_R`, `City_L`, `City_R`, `Alley`
+
+**TrafficManager:**
+```
+AllowedLaneTags: [Highway_L, Highway_R, City_L, City_R, Alley]
+GlobalSpeedLimitKPH: 60
+LanePriorities: { Highway_L: 3, Highway_R: 3, City_L: 2, City_R: 2, Alley: 1 }
+```
+
+**RoadSplines:**
+- Highway segments → `LaneTagName: Highway_L`, `SpeedLimitKPH: 120`
+- Highway segments → `LaneTagName: Highway_R`, `SpeedLimitKPH: 120`
+- City streets → `LaneTagName: City_L`, `SpeedLimitKPH: 50`
+- City streets → `LaneTagName: City_R`, `SpeedLimitKPH: 50`
+- Alleys → `LaneTagName: Alley`, `SpeedLimitKPH: 20`
+
+**Spawners:**
+- Spawner 1 (trucks): `TrafficVehicleClasses: [BP_Flatbed, BP_GarbageTruck]`, `AllowedLaneTags: [Highway_L, Highway_R]`
+- Spawner 2 (city cars): `TrafficVehicleClasses: [BP_Taxi, BP_PoliceCar]`, `AllowedLaneTags: []` *(empty = all tags)*
 
 ### Spawner Configuration
 
@@ -283,9 +401,7 @@ The ECS runs these processors each frame:
 |-----------|-----------|---------|
 | LaneFollowing | Every frame | Advance vehicles along ZoneGraph lanes |
 | ObstacleAvoidance | Every frame | IDM-based speed control with leader gap tracking |
-| Overtake | Every frame | Lateral overtake blend |
 | Movement | Every frame | Write final world position to ISM instances |
-| Signal | ~5 Hz | Query traffic signal state |
 | GiveWay | ~5 Hz | Junction conflict detection |
 
 ### Global Settings
@@ -364,10 +480,18 @@ Configure via `FModularFlightConfig`:
 - Enable `bAutoCalibrateSuspension`.
 
 **AI vehicle doesn't follow roads:**
-- Ensure ZoneGraph is baked in the level (`AZoneShape` actors).
-- Verify `AllowedLaneTags` on `AModularTrafficManager` match your ZoneGraph lane tags.
+- Ensure ZoneGraph is baked in the level (`AZoneShape` actors). Rebuild via the editor toolbar if needed.
+- Verify `AllowedLaneTags` on `AModularTrafficManager` match your ZoneGraph lane tags **exactly** (case-sensitive FName match).
 - Check that `BTService_SplineRoadPlanner` is attached to the Behavior Tree.
 - Enable `bDrawDebugLane` on the SplineRoadPlanner to visualize lane following.
+
+**Custom lane tags not working:**
+- Verify the tag exists in **Project Settings → Plugins → ZoneGraph → Zone Graph Tag List**.
+- Verify the tag is assigned to at least one `AZoneShape` lane in your level.
+- Verify the **exact same FName** appears in `AModularTrafficManager::AllowedLaneTags`.
+- If using `AModularRoadSpline`, verify `LaneTagName` matches.
+- Rebuild ZoneGraph after any tag changes.
+- The spawner's `AllowedLaneTags` can be left **empty** to inherit from the Traffic Manager — only fill it if you want a subset.
 
 **Traffic piles up in one area:**
 - Enable density balancing on the spawner (`NumDensitySectors`, `MaxSectorFraction`).
@@ -382,3 +506,15 @@ Configure via `FModularFlightConfig`:
 - Ensure `bIsBikeConfiguration` is checked on the Core.
 - Increase `BikeUprightStiffness` and `BikeLowSpeedStiffness`.
 
+---
+
+## Features Under Development
+
+The following features are included in the plugin source but are **still under active development**. They are not yet stable and **should not be used in a production project** at this time. They will be documented fully once they are ready:
+
+- **Vehicle Damage System** (`ModularDamageComponent`) — Real-time mesh deformation, damage zones, and part detachment.
+- **Dynamic Mud Pit** (`ModularMudPit`) — Deformable terrain with wheel sinking and persistent tracks.
+- **Traffic Overtaking** (`MassTrafficOvertakeProcessor`) — Lateral lane-change overtake maneuvers for mass traffic entities.
+- **Traffic Signals** (`ATrafficLightIntersection`) — Signalized intersection control with multi-phase signal cycles.
+
+These systems are functional in isolation but may have edge cases, missing polish, or API changes in upcoming updates. Use at your own risk if experimenting, but do not ship with them enabled.
