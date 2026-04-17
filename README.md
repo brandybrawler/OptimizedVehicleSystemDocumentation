@@ -26,6 +26,7 @@ This handbook is written for plugin users. It focuses on setup, asset usage, edi
 - [Building your own fixed-wing airplane](#building-your-own-fixed-wing-airplane)
 - [Building your own traffic scene](#building-your-own-traffic-scene)
 - [Building your own runway or airport scene](#building-your-own-runway-or-airport-scene)
+- [Blueprint functions reference](#blueprint-functions-reference)
 - [Full settings reference](#full-settings-reference)
   - [ModularVehicleCore](#modularvehiclecore)
   - [ModularEngineComponent](#modularenginecomponent)
@@ -42,7 +43,6 @@ This handbook is written for plugin users. It focuses on setup, asset usage, edi
   - [ModularRoadSpline](#modularroadspline)
   - [ModularTrafficManager](#modulartrafficmanager)
   - [ModularTrafficSpawner](#modulartrafficspawner)
-  - [TrafficLightIntersection](#trafficlightintersection)
   - [MassTrafficSettings](#masstrafficsettings)
   - [MassTrafficVehicleTrait](#masstrafficvehicletrait)
   - [MassTrafficSpawnPointsGenerator](#masstrafficspawnpointsgenerator)
@@ -66,7 +66,7 @@ This handbook is written for plugin users. It focuses on setup, asset usage, edi
 - Helicopter and hybrid rotor flight
 - Fixed-wing airplane flight
 - Player-controlled and AI-controlled vehicle setups
-- Damage-ready vehicle parts
+- Generic destruction and static-mesh deformation-ready vehicle parts
 - Vehicle AI with blackboard and behavior tree support
 - Road traffic setup tools
 - Runway and airport-style setup tools
@@ -163,8 +163,6 @@ The plugin declares several built-in Unreal dependencies. In most cases they are
 | `MassGameplay` | Needed for Mass traffic features |
 | `ProceduralMeshComponent` | Used by deformation and damage workflows |
 | `Niagara` | Used for damage and failure effects |
-| `GeometryCollectionPlugin` | Required when using fracture-related content |
-| `Fracture` | Required for fracture workflows used by supported content setups |
 
 ### Recommended project checks
 
@@ -377,7 +375,6 @@ At a high level, the traffic system needs:
 - Consistent lane tags
 - A traffic manager
 - One or more spawners
-- Optional traffic lights
 
 ### Runway and aircraft setup
 
@@ -395,7 +392,6 @@ Keep these tag-driven systems aligned:
 - `ModularRoadSpline` lane tags
 - `ModularTrafficManager` allowed lane tags
 - `ModularTrafficSpawner` allowed lane tags
-- `TrafficLightIntersection` phase lane tags
 - AI denied-lane lists and traffic roaming rules
 
 If those names do not match, traffic will appear broken even when the scene looks correct.
@@ -489,9 +485,8 @@ Build from scratch only when you truly need a new layout.
 3. Place the traffic manager.
 4. Fill in allowed lane tags and speed rules.
 5. Place traffic spawners.
-6. Add optional traffic lights at intersections.
-7. Test a small spawn count first.
-8. Increase density only after the route logic works reliably.
+6. Test a small spawn count first.
+7. Increase density only after the route logic works reliably.
 
 ## Building your own runway or airport scene
 
@@ -501,14 +496,164 @@ Build from scratch only when you truly need a new layout.
 - Clear runway direction and spacing
 - Aircraft with `ModularVehicleAIComponent`
 - Enough approach and rollout distance
+- A taxi spline that matches the path you want aircraft to follow on the ground
 
 ### Recommended build order
 
 1. Place the runway blueprint.
-2. Rotate it so the approach and takeoff directions face open airspace.
-3. Test manual takeoff and landing first.
-4. After manual flight works, test AI move-to-runway behavior.
-5. Add more runways only after the first one works reliably.
+2. Replace the runway static mesh if you want a different runway look or airport art style.
+3. Move the approach point and takeoff point so they align correctly with the runway you are using.
+4. Edit the taxi spline so it follows your intended taxi route on the ground.
+5. Make sure the taxi spline lets the aircraft taxi in after landing and also taxi into position for takeoff preparation.
+6. Rotate the full runway setup so the approach and takeoff directions face open airspace.
+7. Test manual takeoff and landing first.
+8. After manual flight works, test AI move-to-runway behavior.
+9. Add more runways only after the first one works reliably.
+
+## Blueprint functions reference
+
+This section covers the main exposed Blueprint functions that are useful during gameplay setup and scripting. It is focused on the practical nodes most users are likely to call in Blueprints, especially for AI movement, vehicle control, runway behavior, and damage workflows.
+
+### ModularVehicleAIComponent Blueprint functions
+
+These are the main high-level AI control nodes for vehicles and aircraft.
+
+| Function | What it does | When to use it |
+| --- | --- | --- |
+| `MoveVehicleToLocation` | Sends the vehicle to a world-space destination using the plugin's ground or air AI logic | Use this when you want an AI vehicle to travel to a target point |
+| `MoveVehicleToRunway` | Sends an AI aircraft to a runway actor and uses the runway-aware flight and taxi logic | Use this when an aircraft should approach, land, taxi, or prepare for runway-based movement |
+| `StopVehicle` | Cancels the current AI movement request | Use this when you want to interrupt AI travel, halt roaming, or stop a scripted sequence |
+
+#### Notes for AI movement calls
+
+- `MoveVehicleToRunway` is the most important node for runway-based aircraft behavior.
+- Both movement nodes use the `FlightConfig` values you pass in, so the result depends on your cruising altitude, acceptance radius, landing choice, and taxi distances.
+- The `bPrioritizeDriving` input is useful for multi-mode travel cases where the vehicle should prefer staying on the ground before switching to air movement.
+- Use the `OnMoveStatusChanged` event on the AI component if you want Blueprint logic to react to `Moving`, `Arrived`, or `Failed`.
+
+### ModularVehicleCore Blueprint functions
+
+These are the main control nodes used for player control, scripted control, or simple Blueprint-driven behavior.
+
+| Function | What it does | When to use it |
+| --- | --- | --- |
+| `SetupVehicleInput` | Binds the vehicle to an input component | Use this when handling input setup manually in a custom pawn or controller flow |
+| `ReinitializeVehicleInput` | Rebuilds the input bindings | Use this after changing input setup at runtime |
+| `SetThrottleInput` | Applies throttle input to the vehicle | Use for scripted acceleration or custom player-input pipelines |
+| `SetBrakeInput` | Applies ground brake input | Use for cars, trucks, and other ground vehicles |
+| `SetAirplaneBrakeInput` | Applies airplane brake input | Use for runway braking and fixed-wing ground roll control |
+| `SetReverseInput` | Applies reverse input | Use for scripted reversing or custom control logic |
+| `SetSteeringInput` | Applies steering input | Use for scripted driving or custom steering systems |
+| `SetHandbrakeInput` | Toggles handbrake input | Use for stopping, drift behavior, or emergency control |
+| `SetClutchInput` | Applies clutch input | Use only when your setup uses manual-transmission logic |
+| `ShiftUp` | Requests an upshift | Use in manual-transmission setups |
+| `ShiftDown` | Requests a downshift | Use in manual-transmission setups |
+| `SetVerticalThrustInput` | Applies vertical thrust input | Use for helicopters and vertical-lift vehicles |
+| `SetPitchInput` | Applies pitch input | Use for rotorcraft or scripted flight control |
+| `SetYawInput` | Applies yaw input | Use for rotorcraft or scripted flight control |
+| `SetRollInput` | Applies roll input | Use for rotorcraft or scripted flight control |
+| `SetFlightMode` | Forces flight mode on or off | Use when switching a supported vehicle between travel modes |
+| `SetEngineState` | Turns the propulsion system on or off | Use when spawning vehicles cold, starting engines by script, or forcing shutdown |
+| `ToggleFlightMode` | Toggles flight mode | Use when you want simple on or off switching without manually tracking state |
+| `SetLandingGearRetracted` | Directly sets landing gear state | Use when you want exact control over deployed vs retracted gear |
+| `RetractLandingGear` | Retracts the landing gear | Use for aircraft after takeoff |
+| `DeployLandingGear` | Deploys the landing gear | Use before landing or low-speed runway operations |
+
+#### Notes for vehicle control calls
+
+- These nodes are useful for scripted sequences even if the vehicle is normally player-controlled.
+- `SetEngineState`, `SetFlightMode`, and landing gear nodes are especially useful for cutscenes, startup sequences, and AI or player transition logic.
+- For custom input systems, these nodes let you bypass the default key bindings and drive the plugin directly from your own Blueprint events.
+
+### ModularRunwayActor Blueprint functions
+
+These nodes help aircraft and runway logic read and manage the runway setup.
+
+| Function | What it does | When to use it |
+| --- | --- | --- |
+| `GetApproachPointLocation` | Returns the runway approach point location | Use when you need a scripted reference point for approach logic |
+| `GetTakeoffPointLocation` | Returns the takeoff point location | Use when you need a scripted reference point for runway departure logic |
+| `GetRunwayCenterLocation` | Returns the center of the runway actor | Use for alignment, debug, or general scene logic |
+| `GetRunwayApproachDirection` | Returns the runway approach direction | Use for aligning aircraft behavior to runway heading |
+| `GetRunwayLengthCM` | Returns runway length | Use when scaling approach or stopping logic to runway size |
+| `HasTaxiSpline` | Reports whether a taxi spline is present | Use when validating a runway setup before AI uses it |
+| `GetTaxiSplineLengthCM` | Returns the taxi spline length | Use for taxi planning and debug |
+| `GetTaxiSplineLocationAtDistance` | Returns a taxi spline position at a given distance | Use for custom taxi movement or debug visualization |
+| `GetTaxiSplineDirectionAtDistance` | Returns the taxi spline direction at a given distance | Use for custom rotation alignment along the taxi route |
+| `FindTaxiSplineDistanceClosestToWorldLocation` | Finds the nearest taxi spline distance to a world location | Use to place an aircraft onto the spline or sync it to runway ground movement |
+| `RegisterTaxiOccupant` | Registers an aircraft as using the taxi spline | Use when implementing custom taxi traffic management |
+| `UnregisterTaxiOccupant` | Removes an aircraft from taxi occupancy tracking | Use when taxiing is complete or the aircraft leaves the runway path |
+| `UpdateTaxiOccupant` | Updates the aircraft position along the taxi spline | Use every update while a custom taxiing aircraft is moving on the spline |
+| `GetSafeStopDistanceForOccupant` | Returns the stop distance needed to avoid the aircraft ahead | Use when you want custom Blueprint taxi behavior to respect runway traffic spacing |
+| `GetTaxiOccupantCount` | Returns how many aircraft are currently registered on the taxi spline | Use for debug or runway-traffic logic |
+| `IsTaxiOccupant` | Checks whether a pawn is registered on the taxi spline | Use for validation and custom taxi management |
+
+#### Notes for runway helper calls
+
+- Most users will rely on the built-in aircraft AI rather than manually driving taxi behavior.
+- These nodes become useful when you want custom airport sequencing, debug tools, or more advanced Blueprint runway logic.
+- If you build your own taxi system in Blueprints, keep it aligned with the runway actor's approach point, takeoff point, and taxi spline.
+
+### ModularEngineComponent Blueprint functions
+
+These nodes are useful when you want direct Blueprint control over engine behavior.
+
+| Function | What it does | When to use it |
+| --- | --- | --- |
+| `SetEngineActive` | Turns the engine on or off | Use for startup, shutdown, spawn-state setup, or scripted control |
+| `SetOvertakeTorqueBoost` | Temporarily boosts engine torque | Use for scripted overtaking or temporary acceleration boosts |
+| `ShiftUp` | Requests an upshift | Use in manual-transmission Blueprint logic |
+| `ShiftDown` | Requests a downshift | Use in manual-transmission Blueprint logic |
+
+### ModularLandingGearComponent Blueprint functions
+
+These nodes are useful when you want to script gear deployment directly on a gear component.
+
+| Function | What it does | When to use it |
+| --- | --- | --- |
+| `SetGearDeployed` | Sets the gear to a deployed state | Use when scripting gear deployment explicitly |
+| `SetGearRetracted` | Sets the gear to a retracted state | Use when scripting retraction explicitly |
+| `RetractGear` | Retracts the gear | Use for direct aircraft or cinematic control |
+| `DeployGear` | Deploys the gear | Use before landing or while preparing a grounded aircraft |
+
+### ModularDamageComponent Blueprint functions
+
+These nodes drive the supported generic destruction and static mesh deformation workflow.
+
+| Function | What it does | When to use it |
+| --- | --- | --- |
+| `ApplyImpactDamage` | Applies impact-based damage to a mesh part | Use when you want Blueprint-driven collision damage or custom impact events |
+| `ResetDamage` | Clears accumulated damage and returns the vehicle to its starting damage state | Use for resets, respawns, or test workflows |
+| `ForceDetachPart` | Forces a part into a detached state | Use for scripted damage moments or cinematic failure events |
+| `ApplyInflictorDamage` | Applies damage using a damage-inflictor component | Use when your game logic uses explicit damage sources or special hazards |
+
+### DamageInflictorComponent Blueprint functions
+
+| Function | What it does | When to use it |
+| --- | --- | --- |
+| `ApplyToHitResult` | Applies this inflictor's configured damage through a hit result | Use when a Blueprint already has a hit result and you want to apply targeted damage through the plugin's damage system |
+
+### ModularWheelComponent, ModularRotorComponent, and ModularPropellerComponent damage functions
+
+These components also expose part-level damage functions, mainly for custom failure scripting.
+
+| Function | What it does | When to use it |
+| --- | --- | --- |
+| `SetDamageFailed` | Forces the part into a failed state | Use when you want to script wheel, rotor, or propeller failure directly |
+
+### Blueprint function usage recommendation
+
+For most users, the most important exposed Blueprint nodes are:
+
+- `MoveVehicleToLocation`
+- `MoveVehicleToRunway`
+- `StopVehicle`
+- `SetEngineState`
+- `SetFlightMode`
+- `DeployLandingGear`
+- `RetractLandingGear`
+
+If you are building gameplay systems, cutscenes, airport logic, or custom AI wrappers in Blueprints, start with those nodes first before moving into the lower-level runway-traffic or part-damage helpers.
 
 ## Full settings reference
 
@@ -824,6 +969,8 @@ The reference below is grouped by system and is written around what you see in t
 
 ## ModularDamageComponent
 
+This damage system is documented around the current supported workflow: generic runtime destruction effects plus static mesh deformation.
+
 ### Failure effects
 
 | Setting | What it controls | Increase when | Decrease when | Notes |
@@ -940,7 +1087,10 @@ These values are chosen when you tell an AI aircraft where to go.
 
 ### Runway setup notes
 
-- The runway actor also contains approach, takeoff, and taxi references that need correct placement and orientation in the level.
+- You can replace the runway actor's static mesh with any runway mesh that fits your airport scene.
+- After changing the runway mesh, move the approach point and takeoff point so they line up correctly with the runway you want the aircraft to use.
+- Adjust the taxi spline so it follows your intended ground taxi route rather than leaving it in the default shape.
+- Your taxi spline should support the full ground loop you want: aircraft should be able to taxi after landing and also taxi into the correct position to prepare for takeoff.
 - Always point the runway so approach and takeoff directions face usable airspace.
 - Test one runway thoroughly before adding several.
 
@@ -1009,16 +1159,6 @@ These values are chosen when you tell an AI aircraft where to go.
 | `MaxLocalDensityCount` | Max nearby vehicles before local spawning is restricted | You want heavier local density | You want tighter anti-clumping behavior | Good for preventing crowded pockets |
 | `bAdaptiveCongestionDespawn` | Despawns adaptively when congestion builds | You want automatic cleanup in jams | You want traffic to persist even in congestion | Scene-stability control |
 | `MinCongestionDespawnDistance` | Closest distance where congestion-based despawn is allowed | Despawn should happen farther from the player only | Despawn can happen somewhat closer | Helps hide cleanup from the player |
-
-## TrafficLightIntersection
-
-| Setting | What it controls | Increase when | Decrease when | Notes |
-| --- | --- | --- | --- | --- |
-| `Phase1LaneTags` | Lane tags that are green during phase 1 | More lanes should flow in phase 1 | Fewer lanes should flow in phase 1 | Must match your road tag naming |
-| `Phase2LaneTags` | Lane tags that are green during phase 2 | More lanes should flow in phase 2 | Fewer lanes should flow in phase 2 | Must match your road tag naming |
-| `GreenPhaseSec` | Length of the green phase | Intersections should keep one direction moving longer | Light changes should happen more often | Major traffic rhythm setting |
-| `YellowPhaseSec` | Length of the yellow phase | Drivers need more transition time | The intersection spends too long changing | Safety timing control |
-| `IntersectionRadiusCM` | Area around the light treated as the intersection | More space should belong to the light-controlled zone | The light influences too wide an area | Keep scaled to the actual junction size |
 
 ## MassTrafficSettings
 
@@ -1228,7 +1368,7 @@ These settings appear in **Project Settings > Plugins > Mass Traffic**.
 ### Traffic is not moving
 
 - Check that your lane or road setup exists and is valid.
-- Make sure lane tags are consistent across roads, traffic manager, spawner, and traffic lights.
+- Make sure lane tags are consistent across roads, the traffic manager, and your traffic spawners.
 - Reduce the traffic setup to one manager and one spawner first.
 - Start with a small spawn count and scale upward only after movement works.
 
